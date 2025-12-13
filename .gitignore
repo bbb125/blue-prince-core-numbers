@@ -1,0 +1,4 @@
+CMakeUserPresets.json
+CMakePresets.json
+build/**
+input*.txt
