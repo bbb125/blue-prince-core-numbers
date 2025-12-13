@@ -2,9 +2,9 @@
 #include <fmt/ranges.h>
 
 #include <array>
+#include <algorithm>
 #include <functional>
 #include <ranges>
-#include <set>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -18,8 +18,10 @@ namespace bp
 // If the result is impossible (negative, not large enough, fractional) - discard.
 // Transform core numbers to letters (1->A, 2->B, ... 26->Z).
 // Collect unique letters from all results for a word.
+// - First operations is always addition.
+// - In case of multiple letters, take the minimum.
 
-// Looks like first-letters of the result sets - form a phrase.
+//
 // STILL WATER TINTS BLANK BOOKS
 using std::string_view_literals::operator""sv;
 constexpr auto puzzle = std::to_array({
@@ -61,11 +63,13 @@ constexpr auto solveCoreNumbers()
 {
     std::vector<std::vector<std::int64_t>> numbers;
 
-    auto ops = std::to_array({Add, Sub, Mul, Div});
+    auto ops = std::to_array({Sub, Mul, Div});
     auto result = std::vector<std::vector<Operation>>{};
+    auto add = std::views::single(Add);
     do
     {
-        result.push_back(ops | std::ranges::to<std::vector>());
+        result.push_back(std::views::concat(add, ops)
+                         | std::ranges::to<std::vector>());
     } while (std::ranges::next_permutation(ops).found);
     return result;
 }
@@ -106,19 +110,8 @@ static_assert(isIntegral(123));
 static_assert(isIntegral(0));
 static_assert(isIntegral(-1));
 
-std::string uniqueCharacters(std::ranges::range auto rng)
-{
-    return std::ranges::fold_left(  //
-        rng,
-        std::string{},
-        [](auto&& acc, auto ch)
-        {
-            if (not std::ranges::contains(acc, ch))
-                acc.push_back(ch);
-            return std::move(acc);
-        });
-}
 }  // namespace bp
+
 int main()
 {
     namespace rv = std::ranges::views;
@@ -134,13 +127,12 @@ int main()
                 | rv::filter(isIntegral)
                 | rv::filter([](auto val)
                              { return val > 0 && val <= 26 || val >= 10000; });
-
-            auto characters = uniqueCharacters(  //
+            auto character = rng::min(  //
                 integralResults
                 | rv::transform([](auto val)
                                 { return static_cast<char>(val + 'A' - 1); }));
 
-            fmt::print("{},", characters);
+            fmt::print("{}", character);
         }
         fmt::println("");
     }
