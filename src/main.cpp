@@ -26,6 +26,14 @@ namespace bp
 
 //
 // STILL WATER TINTS BLANK BOOKS
+
+// There is a bug in the puzzle in the input: HEAT
+// The solution only works, because accumulated floating point errors.
+// HEAT results in 12.000000000000002 instead of 12.
+// But similar operations in the Billiard Room (number / 3 and * 3) produce
+// exact results. So if we used rational arithmetic, the solution would result
+// in a different word. Looks like the puzzle was designed for floating point
+// arithmetic... or tested only with it.
 using std::string_view_literals::operator""sv;
 constexpr auto puzzle = std::to_array({
     // clang-format off
