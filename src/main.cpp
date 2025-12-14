@@ -9,6 +9,9 @@
 #include <string_view>
 #include <vector>
 
+namespace rv = std::ranges::views;
+namespace rng = std::ranges;
+
 namespace bp
 {
 // Each word maps letters A-Z to numbers 1-26
@@ -33,18 +36,22 @@ constexpr auto puzzle = std::to_array({
      std::to_array({"HAND"sv, "VASE"sv, "SAFE"sv, "CLAY"sv, "TOES"sv,}),
 });  // clang-format on
 
+constexpr auto toNumbers(std::string_view word)
+{
+    return word
+           | rv::transform([](auto ch) -> std::int64_t { return ch - 'A' + 1; })
+           | rng::to<std::vector>();
+}
+
+constexpr auto toCharacter(std::int64_t number)
+{
+    return static_cast<char>(number + 'A' - 1);
+}
+
 constexpr auto toNumbers(std::span<const std::string_view> words)
 {
-    std::vector<std::vector<std::int64_t>> numbers;
-    for (const auto& word : words)
-    {
-        numbers.push_back(  //
-            word
-            | std::views::transform(
-                [](auto ch) { return static_cast<std::int64_t>(ch - 'A' + 1); })
-            | std::ranges::to<std::vector>());
-    }
-    return numbers;
+    return words | rv::transform([](auto word) { return toNumbers(word); })
+           | rng::to<std::vector>();
 }
 
 enum Operation
@@ -54,7 +61,8 @@ enum Operation
     Mul,
     Div,
 };
-constexpr auto format_as(Operation op)
+
+constexpr auto format_as(Operation op)  // for debug
 {
     return std::to_underlying(op);
 }
@@ -68,18 +76,15 @@ constexpr auto solveCoreNumbers()
     auto add = std::views::single(Add);
     do
     {
-        result.push_back(std::views::concat(add, ops)
-                         | std::ranges::to<std::vector>());
-    } while (std::ranges::next_permutation(ops).found);
+        result.push_back(rv::concat(add, ops) | rng::to<std::vector>());
+    } while (rng::next_permutation(ops).found);
     return result;
 }
 
 auto ops = solveCoreNumbers();
+
 auto applyOps(std::span<Operation> operations, std::span<const std::int64_t> numbers)
 {
-    namespace rv = std::ranges::views;
-    namespace rng = std::ranges;
-
     return rng::fold_left(  //
         rv::zip(operations, numbers),
         0.0,
@@ -101,39 +106,38 @@ auto applyOps(std::span<Operation> operations, std::span<const std::int64_t> num
         });
 }
 
+
 constexpr auto isIntegral(double val)
 {
     return val == static_cast<std::int64_t>(val);
 }
+
 static_assert(not isIntegral(1.777));
 static_assert(isIntegral(123));
 static_assert(isIntegral(0));
 static_assert(isIntegral(-1));
 
+constexpr auto toCoreNumber(std::span<std::int64_t> numbers)
+{
+    auto possibleCoreNumbers =
+        ops | rv::transform(std::bind_back(applyOps, numbers)) | rv::filter(isIntegral)
+        | rv::filter([](auto val)
+                     { return val > 0 && val <= 26 || val >= 10000; });
+    // The smallest one is the core
+    return rng::min(possibleCoreNumbers);
+}
+
+constexpr auto rowToWord(std::span<const std::string_view> row)
+{
+    return toNumbers(row) | rv::transform(toCoreNumber)
+           | rv::transform(toCharacter) | rng::to<std::string>();
+}
 }  // namespace bp
 
 int main()
 {
-    namespace rv = std::ranges::views;
-    namespace rng = std::ranges;
     using namespace bp;
-    for (auto& row : puzzle)
-    {
-        auto numbers = toNumbers(row);
-        for (const auto& number : numbers)
-        {
-            auto integralResults =
-                ops | rv::transform(std::bind_back(applyOps, number))
-                | rv::filter(isIntegral)
-                | rv::filter([](auto val)
-                             { return val > 0 && val <= 26 || val >= 10000; });
-            auto character = rng::min(  //
-                integralResults
-                | rv::transform([](auto val)
-                                { return static_cast<char>(val + 'A' - 1); }));
 
-            fmt::print("{}", character);
-        }
-        fmt::println("");
-    }
+    auto solution = puzzle | rv::transform(rowToWord) | rng::to<std::vector>();
+    fmt::println("{}", fmt::join(solution, "\n"));
 }
